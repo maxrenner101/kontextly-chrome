@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Kontextly</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; width: 360px; height: 480px; overflow: hidden; }
+      #root { height: 100%; }
+      .kontextly-action-card:hover {
+        border-color: oklch(0.65 0.25 285 / 0.5) !important;
+        box-shadow: 0 0 0 1px oklch(0.65 0.25 285 / 0.2);
+      }
+      .kontextly-upgrade-btn:hover {
+        background: oklch(0.7 0.22 285) !important;
+      }
+      .kontextly-account-link:hover {
+        border-color: oklch(0.65 0.25 285 / 0.4) !important;
+        background: oklch(0.22 0.01 285) !important;
+      }
+      .kontextly-tab-content::-webkit-scrollbar {
+        width: 6px;
+      }
+      .kontextly-tab-content::-webkit-scrollbar-thumb {
+        background: oklch(0.25 0.01 285);
+        border-radius: 3px;
+      }
+    </style>
+    <script src="js/vendor.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="js/popup.js"></script>
+  </body>
+</html>
+

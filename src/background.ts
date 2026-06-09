@@ -95,6 +95,25 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender,
         sendResponse({ tabId: sender.tab?.id });
         break;
 
+      case 'AI_FILL':
+        try {
+          const session = await getStoredSession();
+          if (!session) {
+            sendResponse({ error: 'Not authenticated' });
+            break;
+          }
+          const fillRes = await apiCall('/automation/fill', 'POST', message.data);
+          sendResponse(fillRes);
+        } catch (error) {
+          sendResponse({ error: 'Fill failed' });
+        }
+        break;
+
+      case 'OPEN_POPUP':
+        (chrome.action as any).openPopup?.().catch?.(() => {});
+        sendResponse({ success: true });
+        break;
+
       default:
         sendResponse({ error: `Unknown message type: ${message.type}` });
     }

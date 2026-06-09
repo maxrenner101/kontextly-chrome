@@ -160,14 +160,22 @@ function SessionCard({ item }: { item: AutomationSessionItem }) {
   );
 }
 
-function useAuthFetcher(session: Session | null) {
+function useAuthFetcher(session: Session | null, logoutOn401 = true) {
   return (url: string) => {
     if (!session?.token) return Promise.reject('No token');
     return fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json' },
       body: url.includes('/sessions') ? JSON.stringify({ limit: 15 }) : undefined
-    }).then(r => r.json());
+    }).then(r => {
+      if (r.status === 401 && logoutOn401) {
+        chrome.storage.local.remove('session');
+        window.location.reload();
+        throw new Error('Unauthorized');
+      }
+      if (!r.ok) throw new Error(`${r.status}`);
+      return r.json();
+    });
   };
 }
 
@@ -194,10 +202,11 @@ const Popup = () => {
   }, []);
 
   const fetcher = useAuthFetcher(session);
+  const verifyFetcher = useAuthFetcher(session, false);
 
   const { data: userData } = useSWR<{ user: Session['user']; plan: string }>(
     session?.token ? `${API_BASE_URL}/auth/extension/verify` : null,
-    fetcher,
+    verifyFetcher,
     { revalidateOnFocus: true }
   );
   const user = userData?.user || session?.user;

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
-import { Send, Loader2, Square, X, ChevronLeft, Maximize2 } from "lucide-react";
+import { Send, Loader2, Square, X, ChevronLeft, Maximize2, Sparkles } from "lucide-react";
 
 type UIMode = 'panel' | 'progress-bar';
 
@@ -159,17 +159,17 @@ const STYLES = `
   }
 
   .kontextly-chat-input-area {
-    padding: 12px 16px;
+    padding: 8px 12px;
     border-top: 1px solid oklch(0.22 0.01 285);
     display: flex;
     gap: 8px;
-    align-items: center;
+    align-items: flex-end;
     flex-shrink: 0;
   }
   .kontextly-chat-input {
-    all: unset !important;
     flex: 1 !important;
-    padding: 10px 14px !important;
+    min-height: 40px !important;
+    padding: 8px 12px !important;
     background: oklch(0.18 0.01 285) !important;
     border: 1px solid oklch(0.22 0.01 285) !important;
     border-radius: 8px !important;
@@ -179,12 +179,56 @@ const STYLES = `
     outline: none !important;
     box-sizing: border-box !important;
     display: block !important;
+    line-height: 1.8 !important;
+    overflow-y: auto !important;
+    max-height: 120px !important;
     -webkit-text-fill-color: oklch(0.98 0 0) !important;
+    cursor: text !important;
+    word-break: break-word !important;
+    white-space: pre-wrap !important;
+    transition: border-color 0.15s, box-shadow 0.15s !important;
   }
-  .kontextly-chat-input::placeholder { color: oklch(0.5 0 0) !important; -webkit-text-fill-color: oklch(0.5 0 0) !important; }
   .kontextly-chat-input:focus {
     border-color: oklch(0.65 0.25 285) !important;
     box-shadow: 0 0 0 2px oklch(0.65 0.25 285 / 0.2) !important;
+  }
+  .kontextly-chat-input:empty::before,
+  .kontextly-chat-input.kontextly-empty::before {
+    content: attr(data-placeholder);
+    color: oklch(0.5 0 0) !important;
+    -webkit-text-fill-color: oklch(0.5 0 0) !important;
+    pointer-events: none;
+  }
+  .kontextly-chat-input .kontextly-input-chip {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px 1px 4px;
+    margin: 0 2px;
+    background: oklch(0.22 0.06 285);
+    border: 1px solid oklch(0.3 0.08 285);
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: oklch(0.8 0.1 285);
+    white-space: nowrap;
+    max-width: 200px;
+    vertical-align: middle;
+    user-select: all;
+    cursor: default;
+  }
+  .kontextly-chat-input .kontextly-input-chip-icon {
+    width: 12px;
+    height: 12px;
+    color: oklch(0.6 0.2 285);
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+  }
+  .kontextly-chat-input .kontextly-input-chip-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
   }
   .kontextly-send-btn {
     width: 40px;
@@ -309,6 +353,192 @@ const STYLES = `
     border: 1px solid oklch(0.3 0.06 285);
     border-left: 3px solid oklch(0.65 0.25 285);
     flex-shrink: 0;
+  }
+
+  /* Context selection feature */
+  .kontextly-context-btn {
+    position: fixed;
+    z-index: 2147483646;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: oklch(0.18 0.04 285);
+    border: 1px solid oklch(0.35 0.15 285);
+    color: oklch(0.75 0.2 285);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    transition: background 0.15s, transform 0.15s, border-color 0.15s;
+    animation: kontextly-fadeIn 0.15s ease-out;
+  }
+  .kontextly-context-btn:hover {
+    background: oklch(0.25 0.08 285);
+    border-color: oklch(0.5 0.2 285);
+    transform: scale(1.1);
+  }
+  @keyframes kontextly-fadeIn {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .kontextly-hover-overlay {
+    position: fixed;
+    z-index: 2147483645;
+    pointer-events: none;
+    border-radius: 8px;
+  }
+  .kontextly-hover-overlay .kontextly-border-edge {
+    position: absolute;
+    overflow: hidden;
+  }
+  .kontextly-hover-overlay .kontextly-border-edge-top {
+    top: 0; left: 8px; right: 8px; height: 2px;
+  }
+  .kontextly-hover-overlay .kontextly-border-edge-right {
+    top: 8px; right: 0; width: 2px; bottom: 8px;
+  }
+  .kontextly-hover-overlay .kontextly-border-edge-bottom {
+    bottom: 0; left: 8px; right: 8px; height: 2px;
+  }
+  .kontextly-hover-overlay .kontextly-border-edge-left {
+    top: 8px; left: 0; width: 2px; bottom: 8px;
+  }
+  .kontextly-hover-overlay .kontextly-border-glow-h {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, oklch(0.65 0.25 285 / 0.7), transparent);
+  }
+  .kontextly-hover-overlay .kontextly-border-glow-v {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: linear-gradient(180deg, transparent, oklch(0.55 0.2 300 / 0.7), transparent);
+  }
+  .kontextly-hover-overlay .kontextly-border-bg {
+    position: absolute;
+    inset: 2px;
+    border-radius: 4px;
+    background: oklch(0.65 0.25 285 / 0.04);
+  }
+
+
+  /* Inline AI fill feature */
+  .kontextly-fill-btn {
+    position: fixed;
+    z-index: 2147483646;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: oklch(0.15 0.04 285);
+    border: 1px solid oklch(0.35 0.15 285);
+    color: oklch(0.7 0.2 285);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+    animation: kontextly-fadeIn 0.15s ease-out;
+    opacity: 0.7;
+  }
+  .kontextly-fill-btn:hover {
+    background: oklch(0.22 0.08 285);
+    border-color: oklch(0.5 0.2 285);
+    opacity: 1;
+  }
+  .kontextly-fill-prompt {
+    position: fixed;
+    z-index: 2147483647;
+    width: 340px;
+    background: oklch(0.13 0.02 285);
+    border: 1px solid oklch(0.3 0.1 285);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px oklch(0.2 0.05 285);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: kontextly-fadeIn 0.15s ease-out;
+  }
+  .kontextly-fill-prompt-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: oklch(0.6 0.15 285);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .kontextly-fill-prompt-input {
+    all: unset !important;
+    display: block !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    font-size: 14px !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    color: oklch(0.95 0 0) !important;
+    background: oklch(0.1 0.01 285) !important;
+    border: 1px solid oklch(0.25 0.08 285) !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    outline: none !important;
+    line-height: 1.4 !important;
+  }
+  .kontextly-fill-prompt-input:focus {
+    border-color: oklch(0.55 0.2 285) !important;
+    box-shadow: 0 0 0 2px oklch(0.55 0.2 285 / 0.2) !important;
+  }
+  .kontextly-fill-prompt-input::placeholder {
+    color: oklch(0.45 0 0) !important;
+  }
+  .kontextly-fill-prompt-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .kontextly-fill-prompt-hint {
+    font-size: 11px;
+    color: oklch(0.45 0 0);
+  }
+  .kontextly-fill-prompt-submit {
+    all: unset !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: oklch(0.55 0.2 285) !important;
+    color: #fff !important;
+    border-radius: 6px !important;
+    padding: 6px 14px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: background 0.15s !important;
+  }
+  .kontextly-fill-prompt-submit:hover {
+    background: oklch(0.6 0.22 285) !important;
+  }
+  .kontextly-fill-prompt-submit:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+  }
+  .kontextly-fill-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 13px;
+    color: oklch(0.7 0.15 285);
+  }
+  .kontextly-fill-loading svg {
+    animation: kontextly-spin 1s linear infinite;
+  }
+  @keyframes kontextly-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 
   .kontextly-progress-bar {
@@ -1320,14 +1550,441 @@ const ChatWidget = () => {
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [uiMode, setUIMode] = useState<UIMode>('panel');
   const [actionCount, setActionCount] = useState(0);
+  const [contextBtnPos, setContextBtnPos] = useState<{ x: number; y: number } | null>(null);
+  const activeSelectionRangeRef = useRef<Range | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [hoverRect, setHoverRect] = useState<DOMRect | null>(null);
+  const contextMapRef = useRef<Map<string, string>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const responseHandledRef = useRef(false);
   const stateRestoredRef = useRef(false);
+  const hoveredElRef = useRef<Element | null>(null);
+  const borderAnimRef = useRef<number | null>(null);
+  const borderRefsObj = useRef<{ top: HTMLDivElement | null; right: HTMLDivElement | null; bottom: HTMLDivElement | null; left: HTMLDivElement | null }>({ top: null, right: null, bottom: null, left: null });
+  const chatInputRef = useRef<HTMLDivElement>(null);
+
+  // Inline AI fill feature
+  const [fillBtnPos, setFillBtnPos] = useState<{ x: number; y: number } | null>(null);
+  const [fillPromptPos, setFillPromptPos] = useState<{ x: number; y: number } | null>(null);
+  const [fillPromptValue, setFillPromptValue] = useState("");
+  const [fillLoading, setFillLoading] = useState(false);
+  const fillTargetRef = useRef<HTMLElement | null>(null);
+  const fillPromptInputRef = useRef<HTMLInputElement>(null);
+  const fillPromptValueRef = useRef("");
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  // Inline AI fill — detect focus on text inputs
+  useEffect(() => {
+    const isEditable = (el: Element): boolean => {
+      const tag = el.tagName;
+      if (tag === 'INPUT') {
+        const t = (el as HTMLInputElement).type;
+        return ['text', 'search', 'email', 'url', 'tel', 'password', ''].includes(t);
+      }
+      if (tag === 'TEXTAREA') return true;
+      if ((el as HTMLElement).contentEditable === 'true') return true;
+      return false;
+    };
+
+    const isInsideKontextly = (el: Element | null): boolean => {
+      while (el) {
+        if (el.id === 'kontextly-root' || el.id === 'kontextly-widget-mount') return true;
+        el = el.parentElement;
+      }
+      return false;
+    };
+
+    let hideTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const showBtn = (target: HTMLElement) => {
+      if (isInsideKontextly(target)) return;
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      fillTargetRef.current = target;
+      const rect = target.getBoundingClientRect();
+
+      let btnX = rect.right - 34;
+      const btnY = rect.top + 4;
+      const btnSize = 28;
+
+      const parent = target.parentElement;
+      if (parent) {
+        const siblings = parent.querySelectorAll('button, [role="button"], a, svg, img');
+        siblings.forEach((sib) => {
+          if (sib === target) return;
+          const sibRect = sib.getBoundingClientRect();
+          if (sibRect.width === 0 || sibRect.height === 0) return;
+          if (Math.abs(sibRect.right - rect.right) < 50 && sibRect.top < rect.bottom && sibRect.bottom > rect.top) {
+            btnX = Math.min(btnX, sibRect.left - btnSize - 6);
+          }
+        });
+      }
+
+      btnX = Math.max(rect.left + 4, btnX);
+      setFillBtnPos({ x: btnX, y: btnY });
+    };
+
+    const onFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && isEditable(target)) showBtn(target);
+    };
+
+    const onFocusOut = (e: FocusEvent) => {
+      const related = e.relatedTarget as Element | null;
+      if (related && isInsideKontextly(related)) return;
+      if (fillPromptPos) return;
+      hideTimer = setTimeout(() => {
+        setFillBtnPos(null);
+        fillTargetRef.current = null;
+        hideTimer = null;
+      }, 300);
+    };
+
+    document.addEventListener('focusin', onFocusIn, true);
+    document.addEventListener('focusout', onFocusOut, true);
+    return () => {
+      document.removeEventListener('focusin', onFocusIn, true);
+      document.removeEventListener('focusout', onFocusOut, true);
+    };
+  }, [fillPromptPos]);
+
+  const handleFillBtnClick = () => {
+    if (!fillTargetRef.current) return;
+    const rect = fillTargetRef.current.getBoundingClientRect();
+    setFillBtnPos(null);
+
+    const promptHeight = 120;
+    const promptWidth = 340;
+    const margin = 8;
+
+    let x = Math.min(rect.left, window.innerWidth - promptWidth - margin);
+    x = Math.max(margin, x);
+
+    let y: number;
+    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom;
+
+    if (spaceAbove >= promptHeight + margin) {
+      y = rect.top - promptHeight - margin;
+    } else if (spaceBelow >= promptHeight + margin) {
+      y = rect.bottom + margin;
+    } else if (spaceBelow > spaceAbove) {
+      y = rect.bottom + margin;
+    } else {
+      y = rect.top - promptHeight - margin;
+    }
+
+    y = Math.max(margin, Math.min(y, window.innerHeight - promptHeight - margin));
+
+    setFillPromptPos({ x, y });
+    setFillPromptValue("");
+    fillPromptValueRef.current = "";
+    setTimeout(() => fillPromptInputRef.current?.focus(), 100);
+  };
+
+  const handleFillSubmit = async () => {
+    const prompt = fillPromptValueRef.current || fillPromptValue;
+    if (!prompt.trim() || !fillTargetRef.current || fillLoading) return;
+    setFillLoading(true);
+    try {
+      const existingText = fillTargetRef.current.tagName === 'INPUT' || fillTargetRef.current.tagName === 'TEXTAREA'
+        ? (fillTargetRef.current as HTMLInputElement).value
+        : fillTargetRef.current.textContent || '';
+
+      const data = await new Promise<any>((resolve, reject) => {
+        chrome.runtime.sendMessage({
+          type: 'AI_FILL',
+          data: {
+            prompt,
+            existingText: existingText.substring(0, 500),
+            fieldType: fillTargetRef.current!.tagName.toLowerCase(),
+            pageTitle: document.title
+          }
+        }, (response) => {
+          if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+          else resolve(response);
+        });
+      });
+
+      if (data?.text && fillTargetRef.current) {
+        const el = fillTargetRef.current;
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+          const nativeSetter = Object.getOwnPropertyDescriptor(
+            el.tagName === 'INPUT' ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype, 'value'
+          )?.set;
+          nativeSetter?.call(el, data.text);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+          el.textContent = data.text;
+          el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        }
+      }
+
+      setFillPromptPos(null);
+      setFillPromptValue("");
+      fillTargetRef.current?.focus();
+    } catch (e) {
+      console.error('[Kontextly] Fill error:', e);
+    } finally {
+      setFillLoading(false);
+    }
+  };
+
+  const closeFillPrompt = () => {
+    setFillPromptPos(null);
+    setFillPromptValue("");
+    setFillLoading(false);
+    fillTargetRef.current?.focus();
+  };
+
+  // Text selection detection
+  useEffect(() => {
+    const isInsideWidget = (el: Element | null): boolean => {
+      while (el) {
+        if (el.id === 'kontextly-root' || el.id === 'kontextly-widget-mount') return true;
+        el = el.parentElement;
+      }
+      return false;
+    };
+
+    const onMouseUp = () => {
+      setTimeout(() => {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+          setContextBtnPos(null);
+          return;
+        }
+        const anchorNode = sel.anchorNode;
+        if (anchorNode && isInsideWidget(anchorNode instanceof Element ? anchorNode : anchorNode.parentElement)) return;
+
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) return;
+
+        activeSelectionRangeRef.current = range.cloneRange();
+        setContextBtnPos({ x: rect.right - 16, y: rect.top - 36 });
+      }, 10);
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (target.closest('.kontextly-context-btn')) return;
+      activeSelectionRangeRef.current = null;
+      setContextBtnPos(null);
+      hoveredElRef.current = null;
+      setHoverRect(null);
+    };
+
+    const onSelectionScroll = () => {
+      if (activeSelectionRangeRef.current) {
+        const rect = activeSelectionRangeRef.current.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) {
+          activeSelectionRangeRef.current = null;
+          setContextBtnPos(null);
+        } else if (rect.bottom < 0 || rect.top > window.innerHeight) {
+          setContextBtnPos(null);
+        } else {
+          setContextBtnPos({ x: rect.right - 16, y: rect.top - 36 });
+        }
+      }
+    };
+
+    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('scroll', onSelectionScroll, true);
+    return () => {
+      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('scroll', onSelectionScroll, true);
+    };
+  }, []);
+
+  // Paragraph hover detection
+  useEffect(() => {
+    const textTags = new Set(['P', 'ARTICLE', 'SECTION', 'BLOCKQUOTE', 'LI', 'TD', 'TH', 'DD', 'DT', 'FIGCAPTION']);
+    const minTextLength = 40;
+
+    const isInsideWidget = (el: Element | null): boolean => {
+      while (el) {
+        if (el.id === 'kontextly-root' || el.id === 'kontextly-widget-mount') return true;
+        el = el.parentElement;
+      }
+      return false;
+    };
+
+    const isTextContainer = (el: Element): boolean => {
+      if (textTags.has(el.tagName)) return true;
+      if (el.tagName === 'DIV') {
+        const text = el.textContent || '';
+        const childDivs = el.querySelectorAll('div, section, article');
+        return text.length >= minTextLength && childDivs.length === 0;
+      }
+      return false;
+    };
+
+    const onMouseOver = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (isInsideWidget(target)) return;
+      const sel = window.getSelection();
+      if (sel && sel.toString().trim().length > 0) {
+        hoveredElRef.current = null;
+        setHoverRect(null);
+        return;
+      }
+
+      let el: Element | null = target;
+      while (el) {
+        if (isTextContainer(el) && (el.textContent || '').trim().length >= minTextLength) {
+          if (hoveredElRef.current === el) return;
+          hoveredElRef.current = el;
+          const rect = el.getBoundingClientRect();
+          setHoverRect(rect);
+          return;
+        }
+        el = el.parentElement;
+      }
+    };
+
+    const onMouseOut = (e: MouseEvent) => {
+      const related = e.relatedTarget as Element | null;
+      if (!related || isInsideWidget(related)) return;
+      if (hoveredElRef.current && !hoveredElRef.current.contains(related)) {
+        hoveredElRef.current = null;
+        setHoverRect(null);
+      }
+    };
+
+    const onScroll = () => {
+      if (hoveredElRef.current) {
+        const rect = hoveredElRef.current.getBoundingClientRect();
+        setHoverRect(rect);
+      }
+    };
+
+    document.addEventListener('mouseover', onMouseOver);
+    document.addEventListener('mouseout', onMouseOut);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mouseover', onMouseOver);
+      document.removeEventListener('mouseout', onMouseOut);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, []);
+
+  // Animated border animation loop
+  useEffect(() => {
+    if (!hoverRect) {
+      if (borderAnimRef.current) cancelAnimationFrame(borderAnimRef.current);
+      return;
+    }
+    const animate = () => {
+      const now = Date.now() / 1000;
+      const speed = 0.6;
+      const topX = Math.sin(now * speed) * 100;
+      const rightY = Math.cos(now * speed) * 100;
+      const bottomX = Math.sin(now * speed + Math.PI) * 100;
+      const leftY = Math.cos(now * speed + Math.PI) * 100;
+      if (borderRefsObj.current.top) borderRefsObj.current.top.style.transform = `translateX(${topX}%)`;
+      if (borderRefsObj.current.right) borderRefsObj.current.right.style.transform = `translateY(${rightY}%)`;
+      if (borderRefsObj.current.bottom) borderRefsObj.current.bottom.style.transform = `translateX(${bottomX}%)`;
+      if (borderRefsObj.current.left) borderRefsObj.current.left.style.transform = `translateY(${leftY}%)`;
+      borderAnimRef.current = requestAnimationFrame(animate);
+    };
+    borderAnimRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (borderAnimRef.current) cancelAnimationFrame(borderAnimRef.current);
+    };
+  }, [hoverRect]);
+
+  const insertContextChip = useCallback((contextText: string) => {
+    const el = chatInputRef.current;
+    if (!el) return;
+    // Deduplicate
+    const existing = el.querySelectorAll('.kontextly-input-chip');
+    for (const chip of existing) {
+      if ((chip as HTMLElement).dataset.text === contextText) return;
+    }
+    const words = contextText.split(/\s+/).slice(0, 3).join(' ');
+    const lineCount = contextText.split('\n').filter(l => l.trim()).length;
+    const label = lineCount > 1 ? `${words}... (${lineCount} lines)` : `${words}...`;
+    const chip = document.createElement('span');
+    chip.className = 'kontextly-input-chip';
+    chip.contentEditable = 'false';
+    chip.dataset.text = contextText;
+    chip.title = contextText.substring(0, 300);
+    chip.innerHTML = `<span class="kontextly-input-chip-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg></span><span class="kontextly-input-chip-label">${label}</span>`;
+    // Zero-width space after chip so cursor can land there
+    const spacer = document.createTextNode('\u200B');
+    // Insert at cursor position
+    const selection = el.ownerDocument.getSelection();
+    if (selection && selection.rangeCount > 0 && el.contains(selection.anchorNode)) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(spacer);
+      range.insertNode(chip);
+      // Move cursor after spacer
+      range.setStartAfter(spacer);
+      range.setEndAfter(spacer);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else {
+      el.appendChild(chip);
+      el.appendChild(spacer);
+    }
+    // Store context text in map
+    contextMapRef.current.set(label, contextText);
+  }, []);
+
+  const handleContextAdd = useCallback(() => {
+    const sel = window.getSelection();
+    let text = '';
+    if (sel && !sel.isCollapsed) {
+      text = sel.toString().trim();
+      sel.removeAllRanges();
+    } else if (hoveredElRef.current) {
+      text = (hoveredElRef.current.textContent || '').trim();
+    }
+    if (!text) return;
+    insertContextChip(text);
+    setTimeout(() => chatInputRef.current?.focus(), 0);
+    setContextBtnPos(null);
+    setHoverRect(null);
+    hoveredElRef.current = null;
+    setIsOpen(true);
+    setUIMode('panel');
+  }, [insertContextChip]);
+
+  useEffect(() => {
+    chrome.storage.local.get(['session'], (result) => {
+      setIsAuthenticated(!!result.session?.token);
+    });
+    chrome.storage.onChanged.addListener((changes) => {
+      if (changes.session) {
+        const wasAuth = !!changes.session.oldValue?.token;
+        const isAuth = !!changes.session.newValue?.token;
+        setIsAuthenticated(isAuth);
+        if (wasAuth !== isAuth) {
+          setMessages([]);
+          setSessionId(null);
+          setIsLoading(false);
+          setStatusMessage("");
+          setUIMode('panel');
+          setActionCount(0);
+          if (chatInputRef.current) {
+            chatInputRef.current.innerHTML = '';
+            chatInputRef.current.classList.add('kontextly-empty');
+          }
+          if (tabId) {
+            chrome.storage.local.remove(`kontextly-state-${tabId}`);
+          }
+        }
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -1428,7 +2085,8 @@ const ChatWidget = () => {
                 setActionCount(message.completedActions.length);
                 setMessages(m => {
                   const newMessages = [...m];
-                  const groupIdx = newMessages.findIndex(msg => msg.role === 'action-group');
+                  const lastUserIdx = newMessages.reduce((acc, msg, i) => msg.role === 'user' ? i : acc, -1);
+                  const groupIdx = newMessages.findIndex((msg, i) => i > lastUserIdx && msg.role === 'action-group');
                   const actionGroup = {
                     role: 'action-group' as const,
                     text: '',
@@ -1517,7 +2175,8 @@ const ChatWidget = () => {
               setMessages(m => {
                 const newMessages = [...m];
                 if (data.completedActions?.length > 0) {
-                  const groupIdx = newMessages.findIndex(msg => msg.role === 'action-group');
+                  const lastUserIdx = newMessages.reduce((acc, msg, i) => msg.role === 'user' ? i : acc, -1);
+                  const groupIdx = newMessages.findIndex((msg, i) => i > lastUserIdx && msg.role === 'action-group');
                   const actionGroup = {
                     role: 'action-group' as const,
                     text: '',
@@ -1526,7 +2185,8 @@ const ChatWidget = () => {
                   if (groupIdx >= 0) newMessages[groupIdx] = actionGroup;
                   else newMessages.push(actionGroup);
                 }
-                const hasActions = newMessages.some(msg => msg.role === 'action-group');
+                const lastUserMsgIdx = newMessages.reduce((acc, msg, i) => msg.role === 'user' ? i : acc, -1);
+                const hasActions = newMessages.some((msg, i) => i > lastUserMsgIdx && msg.role === 'action-group');
                 newMessages.push({ role: hasActions ? 'summary' as const : 'bot' as const, text: data.content });
                 return newMessages;
               });
@@ -1559,12 +2219,36 @@ const ChatWidget = () => {
     });
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const getInputContent = (): { display: string; message: string; hasContent: boolean } => {
+    const el = chatInputRef.current;
+    if (!el) return { display: '', message: '', hasContent: false };
+    let display = '';
+    let message = '';
+    for (const node of el.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        display += node.textContent || '';
+        message += node.textContent || '';
+      } else if (node instanceof HTMLElement && node.classList.contains('kontextly-input-chip')) {
+        const ctxText = node.dataset.text || '';
+        const label = node.querySelector('.kontextly-input-chip-label')?.textContent || '';
+        display += label;
+        message += `[Referenced context: "${ctxText.substring(0, 500)}"]`;
+      }
+    }
+    return { display: display.trim(), message: message.trim(), hasContent: display.trim().length > 0 || el.querySelector('.kontextly-input-chip') !== null };
+  };
 
-    const userMessage = input.trim();
-    setMessages(m => [...m, { role: "user", text: userMessage }]);
-    setInput("");
+  const handleSend = async () => {
+    const { display, message: userMessage, hasContent } = getInputContent();
+    if (!hasContent || isLoading) return;
+
+    setMessages(m => [...m, { role: "user", text: display || 'Explain this context' }]);
+    if (chatInputRef.current) {
+      chatInputRef.current.innerHTML = '';
+      chatInputRef.current.classList.add('kontextly-empty');
+      setInput('');
+    }
+    contextMapRef.current.clear();
     setIsLoading(true);
     setStatusMessage("Analyzing your request...");
     setActionCount(0);
@@ -1611,7 +2295,8 @@ const ChatWidget = () => {
           setMessages(m => {
             const newMessages = [...m];
             if (response.completedActions?.length > 0) {
-              const groupIdx = newMessages.findIndex(msg => msg.role === 'action-group');
+              const lastUserIdx = newMessages.reduce((acc, msg, i) => msg.role === 'user' ? i : acc, -1);
+                  const groupIdx = newMessages.findIndex((msg, i) => i > lastUserIdx && msg.role === 'action-group');
               const actionGroup = {
                 role: 'action-group' as const,
                 text: '',
@@ -1620,7 +2305,8 @@ const ChatWidget = () => {
               if (groupIdx >= 0) newMessages[groupIdx] = actionGroup;
               else newMessages.push(actionGroup);
             }
-            const hasActions = newMessages.some(msg => msg.role === 'action-group');
+            const lastUserMsgIdx = newMessages.reduce((acc, msg, i) => msg.role === 'user' ? i : acc, -1);
+                const hasActions = newMessages.some((msg, i) => i > lastUserMsgIdx && msg.role === 'action-group');
             newMessages.push({ role: hasActions ? 'summary' as const : 'bot' as const, text: response.content });
             return newMessages;
           });
@@ -1640,6 +2326,7 @@ const ChatWidget = () => {
       e.preventDefault();
       handleSend();
     }
+    // Ctrl+Z is handled natively by contenteditable
   };
 
   if (isFullscreen) return null;
@@ -1665,7 +2352,28 @@ const ChatWidget = () => {
           </button>
         </div>
         <div className="kontextly-chat-messages">
-          {messages.length === 0 ? (
+          {isAuthenticated === false ? (
+            <div className="kontextly-welcome" style={{ textAlign: 'center' }}>
+              <img src={chrome.runtime.getURL('icon128.png')} alt="" style={{ width: 48, height: 48, margin: '0 auto 16px', borderRadius: 12 }} />
+              <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Sign in to Kontextly</p>
+              <p style={{ fontSize: 13, opacity: 0.7, marginBottom: 20 }}>Connect your account to start automating web tasks.</p>
+              <button
+                onClick={() => { setIsOpen(false); chrome.runtime.sendMessage({ type: 'OPEN_POPUP' }); }}
+                style={{
+                  background: 'oklch(0.55 0.2 285)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '10px 24px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Sign In
+              </button>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="kontextly-welcome">
               <p>Ask me to automate any web task. I can navigate, click, fill forms, and complete complex tasks through conversation.</p>
               <p style={{ marginTop: 12, fontSize: 13 }}>Try: &quot;Search for wireless headphones on Amazon&quot;</p>
@@ -1719,25 +2427,41 @@ const ChatWidget = () => {
 
           <div ref={messagesEndRef} />
         </div>
-        <div className="kontextly-chat-input-area">
-          <input
-            className="kontextly-chat-input"
-            type="text"
-            placeholder="Ask Kontextly to do anything..."
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-          {isLoading ? (
-            <button className="kontextly-stop-btn" onClick={handleStop} aria-label="Stop automation" title="Stop automation">
-              <Square size={16} />
-            </button>
-          ) : (
-            <button className="kontextly-send-btn" onClick={handleSend} disabled={!input.trim()} aria-label="Send">
-              <Send size={18} />
-            </button>
-          )}
-        </div>
+        {isAuthenticated !== false && (
+          <div className="kontextly-chat-input-area">
+            <div
+              ref={chatInputRef}
+              className="kontextly-chat-input"
+              contentEditable={!isLoading}
+              role="textbox"
+              data-placeholder="Ask Kontextly to do anything..."
+              onKeyDown={handleKeyDown}
+              onInput={() => {
+                const el = chatInputRef.current;
+                if (!el) return;
+                const text = el.textContent?.replace(/\u200B/g, '').trim() || '';
+                const hasChips = el.querySelector('.kontextly-input-chip') !== null;
+                if (!text && !hasChips) {
+                  el.innerHTML = '';
+                  el.classList.add('kontextly-empty');
+                } else {
+                  el.classList.remove('kontextly-empty');
+                }
+                setInput(text);
+              }}
+              suppressContentEditableWarning
+            />
+            {isLoading ? (
+              <button className="kontextly-stop-btn" onClick={handleStop} aria-label="Stop automation" title="Stop automation">
+                <Square size={16} />
+              </button>
+            ) : (
+              <button className="kontextly-send-btn" onClick={handleSend} disabled={!getInputContent().hasContent} aria-label="Send">
+                <Send size={18} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {showProgressBar && (
@@ -1776,6 +2500,130 @@ const ChatWidget = () => {
         >
           <ChevronLeft size={18} />
         </button>
+      )}
+
+      {/* Context selection button */}
+      {contextBtnPos && (
+        <button
+          className="kontextly-context-btn"
+          style={{ left: Math.min(contextBtnPos.x, window.innerWidth - 48), top: Math.max(contextBtnPos.y, 8) }}
+          onClick={handleContextAdd}
+          title="Add to Kontextly chat"
+        >
+          <Sparkles size={14} />
+        </button>
+      )}
+
+      {/* Hover border overlay */}
+      {hoverRect && (
+        <div
+          className="kontextly-hover-overlay"
+          style={{ left: hoverRect.left - 8, top: hoverRect.top - 8, width: hoverRect.width + 16, height: hoverRect.height + 16 }}
+        >
+          <div className="kontextly-border-bg" />
+          <div className="kontextly-border-edge kontextly-border-edge-top">
+            <div className="kontextly-border-glow-h" ref={el => { borderRefsObj.current.top = el; }} />
+          </div>
+          <div className="kontextly-border-edge kontextly-border-edge-right">
+            <div className="kontextly-border-glow-v" ref={el => { borderRefsObj.current.right = el; }} />
+          </div>
+          <div className="kontextly-border-edge kontextly-border-edge-bottom">
+            <div className="kontextly-border-glow-h" ref={el => { borderRefsObj.current.bottom = el; }} />
+          </div>
+          <div className="kontextly-border-edge kontextly-border-edge-left">
+            <div className="kontextly-border-glow-v" ref={el => { borderRefsObj.current.left = el; }} />
+          </div>
+          <button
+            className="kontextly-context-btn"
+            style={{ position: 'absolute', top: -16, right: -16, pointerEvents: 'auto' }}
+            onClick={handleContextAdd}
+            title="Add to Kontextly chat"
+          >
+            <Sparkles size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Inline AI fill button */}
+      {fillBtnPos && !fillPromptPos && isAuthenticated !== false && (
+        <button
+          className="kontextly-fill-btn"
+          style={{ left: fillBtnPos.x, top: fillBtnPos.y }}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={handleFillBtnClick}
+          title="AI Fill"
+        >
+          <Sparkles size={13} />
+        </button>
+      )}
+
+      {/* Inline AI fill prompt */}
+      {fillPromptPos && (
+        <div
+          className="kontextly-fill-prompt"
+          style={{ left: fillPromptPos.x, top: fillPromptPos.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="kontextly-fill-prompt-row">
+            <div className="kontextly-fill-prompt-label">AI Fill</div>
+            <button
+              onClick={closeFillPrompt}
+              style={{
+                all: 'unset',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 20,
+                height: 20,
+                borderRadius: 4,
+                color: 'oklch(0.5 0 0)',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'oklch(0.8 0 0)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'oklch(0.5 0 0)')}
+            >
+              <X size={14} />
+            </button>
+          </div>
+          {fillLoading ? (
+            <div className="kontextly-fill-loading">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.49-8.49l2.83-2.83M2 12h4m12 0h4m-3.93 7.07l-2.83-2.83M7.76 7.76L4.93 4.93" />
+              </svg>
+              Generating...
+            </div>
+          ) : (
+            <>
+              <input
+                ref={fillPromptInputRef}
+                className="kontextly-fill-prompt-input"
+                type="text"
+                placeholder="Describe what to write..."
+                value={fillPromptValue}
+                onChange={(e) => { fillPromptValueRef.current = e.target.value; setFillPromptValue(e.target.value); }}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleFillSubmit();
+                  }
+                  if (e.key === 'Escape') closeFillPrompt();
+                }}
+              />
+              <div className="kontextly-fill-prompt-row">
+                <span className="kontextly-fill-prompt-hint">Enter to submit · Esc to cancel</span>
+                <button
+                  className="kontextly-fill-prompt-submit"
+                  onClick={handleFillSubmit}
+                  disabled={!fillPromptValue.trim()}
+                >
+                  Fill
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

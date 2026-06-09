@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Kontextly Pro",
+  "name": "Kontextly",
   "description": "AI-powered web automation. Control your browser with natural language commands.",
-  "version": "1.0",
+  "version": "1.0.1",
 
   "icons": {
     "16": "icon16.png",
@@ -38,7 +38,6 @@
     "tabs",
     "activeTab",
     "webNavigation",
-    "scripting",
     "identity"
   ],
   
